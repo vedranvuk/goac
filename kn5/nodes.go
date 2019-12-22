@@ -28,6 +28,10 @@ func (nc *NodeClass) Read(r io.Reader) error {
 	return nil
 }
 
+func (nc *NodeClass) Write(w io.Writer) error {
+	return WriteInt32(w, int32(*nc))
+}
+
 const (
 	Base NodeClass = iota + 1
 	Mesh
@@ -41,9 +45,7 @@ type Vertex struct {
 	TangentU []float32
 }
 
-func newVertex() *Vertex {
-	return &Vertex{}
-}
+func newVertex() *Vertex { return &Vertex{} }
 
 func (v *Vertex) String() string {
 	return fmt.Sprintf(`Vertex:
@@ -55,30 +57,50 @@ TangentU: %v
 }
 
 func (v *Vertex) Read(r io.Reader) error {
+	// Position.
 	val, err := ReadFloats(r, 3)
 	if err != nil {
 		return err
 	}
 	v.Position = val
-
+	// Normal.
 	val, err = ReadFloats(r, 3)
 	if err != nil {
 		return err
 	}
 	v.Normal = val
-
+	// TexC.
 	val, err = ReadFloats(r, 2)
 	if err != nil {
 		return err
 	}
 	v.TexC = val
-
+	// TangentU.
 	val, err = ReadFloats(r, 3)
 	if err != nil {
 		return err
 	}
 	v.TangentU = val
+	return nil
+}
 
+func (v *Vertex) Write(w io.Writer) error {
+	// Position.
+	if err := WriteFloats(w, v.Position); err != nil {
+		return err
+	}
+	// Normal.
+	if err := WriteFloats(w, v.Normal); err != nil {
+		return err
+	}
+	// TexC.
+	if err := WriteFloats(w, v.TexC); err != nil {
+		return err
+	}
+	// TangentU.
+	if err := WriteFloats(w, v.TangentU); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -99,18 +121,30 @@ Indices: %v
 }
 
 func (vw *VerticeWeight) Read(r io.Reader) error {
+	// Weights.
 	val, err := ReadFloats(r, 4)
 	if err != nil {
 		return err
 	}
 	vw.Weights = val
-
+	// Indices.
 	val, err = ReadFloats(r, 4)
 	if err != nil {
 		return err
 	}
 	vw.Indices = val
+	return nil
+}
 
+func (vw *VerticeWeight) Write(w io.Writer) error {
+	// Weights.
+	if err := WriteFloats(w, vw.Weights); err != nil {
+		return err
+	}
+	// Indices.
+	if err := WriteFloats(w, vw.Indices); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -119,9 +153,7 @@ type Bone struct {
 	Transform []float32
 }
 
-func newBone() *Bone {
-	return &Bone{}
-}
+func newBone() *Bone { return &Bone{} }
 
 func (b *Bone) String() string {
 	return fmt.Sprintf(`Bone:
@@ -131,18 +163,30 @@ Transform: %v
 }
 
 func (b *Bone) Read(r io.Reader) error {
+	// Name.
 	name, err := ReadString(r)
 	if err != nil {
 		return err
 	}
 	b.Name = name
-
+	// Transform.
 	tform, err := ReadMatrix(r)
 	if err != nil {
 		return err
 	}
 	b.Transform = tform
+	return nil
+}
 
+func (b *Bone) Write(w io.Writer) error {
+	// Name.
+	if err := WriteString(w, b.Name); err != nil {
+		return err
+	}
+	// Transform.
+	if err := WriteMatrix(w, b.Transform); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -179,9 +223,7 @@ type Node struct {
 	MisteryBytes [8]byte
 }
 
-func newNode() *Node {
-	return &Node{}
-}
+func newNode() *Node { return &Node{} }
 
 func (n *Node) String() string {
 	return fmt.Sprintf(`Node:
@@ -412,8 +454,7 @@ func (n *Node) Read(r io.Reader) error {
 		// IsRenderable.
 		n.IsRenderable = true
 	}
-
-	// Load children.
+	// Read children.
 	for i := 0; i < len(n.Children); i++ {
 		node := newNode()
 		if err := node.Read(r); err != nil {
@@ -421,6 +462,151 @@ func (n *Node) Read(r io.Reader) error {
 		}
 		n.Children[i] = node
 	}
+	return nil
+}
 
+func (n *Node) Write(w io.Writer) error {
+	// NodeClass.
+	if err := n.NodeClass.Write(w); err != nil {
+		return err
+	}
+	// Name.
+	if err := WriteString(w, n.Name); err != nil {
+		return err
+	}
+	// Child count.
+	if err := WriteInt32(w, int32(len(n.Children))); err != nil {
+		return err
+	}
+	// Active.
+	if err := WriteBoolean(w, n.Active); err != nil {
+		return err
+	}
+	// NodeClass.
+	switch n.NodeClass {
+	case Base:
+		if err := WriteMatrix(w, n.Transform); err != nil {
+			return err
+		}
+	case Mesh:
+		// CastShadows.
+		if err := WriteBoolean(w, n.CastShadows); err != nil {
+			return err
+		}
+		// Visible.
+		if err := WriteBoolean(w, n.IsVisible); err != nil {
+			return err
+		}
+		// Transparent.
+		if err := WriteBoolean(w, n.IsTransparent); err != nil {
+			return err
+		}
+		// Vertexes.
+		if err := WriteUint32(w, uint32(len(n.Vertices))); err != nil {
+			return err
+		}
+		for _, vtx := range n.Vertices {
+			if err := vtx.Write(w); err != nil {
+				return err
+			}
+		}
+		// Indices.
+		if err := WriteUint32(w, uint32(len(n.Indices))); err != nil {
+			return err
+		}
+		for _, indice := range n.Indices {
+			if err := WriteUint16(w, indice); err != nil {
+				return err
+			}
+		}
+		// MaterialID.
+		if err := WriteUint32(w, n.MaterialID); err != nil {
+			return err
+		}
+		// Layer.
+		if err := WriteUint32(w, n.Layer); err != nil {
+			return err
+		}
+		// LodIn.
+		if err := WriteFloat(w, n.LodIn); err != nil {
+			return err
+		}
+		// LodOut.
+		if err := WriteFloat(w, n.LodOut); err != nil {
+			return err
+		}
+		// BoundingSphereCenter
+		if err := WriteFloats(w, n.BoundingSphereCenter); err != nil {
+			return err
+		}
+		// BoundingSphereRadius
+		if err := WriteFloat(w, n.BoundingSphereRadius); err != nil {
+			return err
+		}
+		// IsRenderable.
+		if err := WriteBoolean(w, n.IsRenderable); err != nil {
+			return err
+		}
+	case SkinnedMesh:
+		// CastShadows.
+		if err := WriteBoolean(w, n.CastShadows); err != nil {
+			return err
+		}
+		// Visible.
+		if err := WriteBoolean(w, n.IsVisible); err != nil {
+			return err
+		}
+		// Transparent.
+		if err := WriteBoolean(w, n.IsTransparent); err != nil {
+			return err
+		}
+		// Bones.
+		if err := WriteUint32(w, uint32(len(n.Bones))); err != nil {
+			return err
+		}
+		for _, bone := range n.Bones {
+			if err := bone.Write(w); err != nil {
+				return err
+			}
+		}
+		// Vertices.
+		if err := WriteUint32(w, uint32(len(n.Vertices))); err != nil {
+			return err
+		}
+		for _, vtx := range n.Vertices {
+			if err := vtx.Write(w); err != nil {
+				return err
+			}
+		}
+		// Indices.
+		if err := WriteUint32(w, uint32(len(n.Indices))); err != nil {
+			return err
+		}
+		for _, indice := range n.Indices {
+			if err := WriteUint16(w, indice); err != nil {
+				return err
+			}
+		}
+		// MaterialID.
+		if err := WriteUint32(w, n.MaterialID); err != nil {
+			return err
+		}
+		// Layer.
+		if err := WriteUint32(w, n.Layer); err != nil {
+			return err
+		}
+		// MisteryBytes.
+		if _, err := w.Write(n.MisteryBytes[:]); err != nil {
+			return err
+		}
+		// IsRenderable.
+		n.IsRenderable = true
+	}
+	// Write children.
+	for _, child := range n.Children {
+		if err := child.Write(w); err != nil {
+			return err
+		}
+	}
 	return nil
 }

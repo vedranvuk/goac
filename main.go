@@ -10,7 +10,7 @@ import (
 
 func main() {
 	start := time.Now()
-	f, err := kn5.Open("/home/vedran/Go/src/github.com/vedranvuk/goac/data/car.kn5")
+	f, err := kn5.Load("/home/vedran/Go/src/github.com/vedranvuk/goac/data/car.kn5")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

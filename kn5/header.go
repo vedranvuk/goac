@@ -1,7 +1,6 @@
 package kn5
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io"
 )
@@ -19,18 +18,39 @@ func (h *Header) String() string {
 }
 
 func (h *Header) Read(r io.Reader) error {
-	if err := binary.Read(r, binary.LittleEndian, &h.Version); err != nil {
+	// Version.
+	version, err := ReadInt32(r)
+	if err != nil {
 		return err
 	}
+	h.Version = version
+	// No extra.
 	if h.Version < 6 {
 		return nil
 	}
-	if err := binary.Read(r, binary.LittleEndian, &h.Extra); err != nil {
+	// Extra.
+	extra, err := ReadInt32(r)
+	if err != nil {
+		return err
+	}
+	h.Extra = extra
+	return nil
+}
+
+func (h *Header) Write(w io.Writer) error {
+	// Version.
+	if err := WriteInt32(w, h.Version); err != nil {
+		return err
+	}
+	// No extra.
+	if h.Version < 6 {
+		return nil
+	}
+	// Extra.
+	if err := WriteInt32(w, h.Extra); err != nil {
 		return err
 	}
 	return nil
 }
 
-func newHeader() *Header {
-	return &Header{}
-}
+func newHeader() *Header { return &Header{} }

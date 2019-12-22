@@ -1,6 +1,7 @@
 package kn5
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -69,17 +70,52 @@ func (f *File) Read(r io.Reader) error {
 	return nil
 }
 
-func Open(filename string) (*File, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR, os.ModePerm)
+func (f *File) Write(w io.Writer) error {
+	// Magic.
+	if _, err := w.Write([]byte("sc6969")); err != nil {
+		return err
+	}
+	// Header.
+	if err := f.Header.Write(w); err != nil {
+		return err
+	}
+	// Textures.
+	if err := f.Textures.Write(w); err != nil {
+		return err
+	}
+	// Materials.
+	if err := f.Materials.Write(w); err != nil {
+		return err
+	}
+	// Nodes.
+	if err := f.RootNode.Write(w); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Load(filename string) (*File, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
+	r := bufio.NewReader(file)
 
 	f := newFile()
-	if err := f.Read(file); err != nil {
+	if err := f.Read(r); err != nil {
 		return nil, fmt.Errorf("error reading kn5 file: %w", err)
 	}
 
 	return f, nil
+}
+
+func Save(filename string, f *File) error {
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return f.Write(file)
 }

@@ -20,6 +20,10 @@ func (mdm *MaterialDepthMode) Read(r io.Reader) error {
 	return nil
 }
 
+func (mdm *MaterialDepthMode) Write(w io.Writer) error {
+	return WriteInt32(w, int32(*mdm))
+}
+
 func (dm MaterialDepthMode) String() string {
 	switch dm {
 	case DepthNormal:

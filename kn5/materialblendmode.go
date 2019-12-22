@@ -13,6 +13,14 @@ func (mbm *MaterialBlendMode) Read(r io.Reader) error {
 	return nil
 }
 
+func (mbm *MaterialBlendMode) Write(w io.Writer) error {
+	bm := []byte{byte(*mbm)}
+	if _, err := w.Write(bm); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (bm MaterialBlendMode) String() string {
 	switch bm {
 	case Opaque:
